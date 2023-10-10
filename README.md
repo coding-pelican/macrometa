@@ -35,7 +35,7 @@ The MCMT Library is organized into several sections, each dedicated to specific 
 To use the MCMT Library in your project, include the `mcmt.h` header file and start leveraging the macros provided by the library. Here's a very simple example:
 
 ```c
-#include "mcmt.h"
+#include "macrometa.h"
 #include <stdio.h>
 
 // Define a macro to square a number.
