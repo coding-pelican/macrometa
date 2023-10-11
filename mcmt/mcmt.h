@@ -130,7 +130,7 @@
  * @param _Z Third token.
  * @return Concatenation of the three tokens with underscores in between.
  */
-#define CONCAT3_(_X, _Y, _Z) _X##_Y##_Z
+#define CONCAT3_(_X, _Y, _Z) _X##_##_Y##_##_Z
 
 #pragma endregion // mcmt_concat
 /*-------------------------------*/
