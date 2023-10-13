@@ -30,7 +30,7 @@
  * - @ref mcmt_basic: Basic macros for handling empty arguments and expansions.
  * - @ref mcmt_concat: Macros for concatenating and manipulating identifiers.
  * - @ref mcmt_cat: Macros for complex identifier concatenation and deferring macro calls.
- * - @ref mcmt_impl_overload: Macros for general macro overloading.
+ * - @ref mcmt_macro_impl_extn_ovld: Macros for extending, implementing, and overloading generic macros.
  * - @ref mcmt_arg: Macros for manipulating and counting arguments.
  * - @ref mcmt_bit_logic: Macros for bitwise logic operations.
  * - @ref mcmt_logic: Macros for boolean and logical operations.
@@ -85,12 +85,25 @@
  * @brief Expands arguments.
  * @param ... Arguments to be expanded.
  */
-#define EXPAND(...) __VA_ARGS__
+#define EXPAND(...)       EXPAND_LIMIT(__VA_ARGS__)
+#define EXPAND0(...)      __VA_ARGS__
+#define EXPAND1(...)      EXPAND0(__VA_ARGS__)
+#define EXPAND2(...)      EXPAND1(EXPAND1(__VA_ARGS__))
+#define EXPAND3(...)      EXPAND2(EXPAND2(__VA_ARGS__))
+#define EXPAND4(...)      EXPAND3(EXPAND3(__VA_ARGS__))
+#define EXPAND5(...)      EXPAND4(EXPAND4(__VA_ARGS__))
+#define EXPAND6(...)      EXPAND5(EXPAND5(__VA_ARGS__))
+#define EXPAND7(...)      EXPAND6(EXPAND6(__VA_ARGS__))
+#define EXPAND_LIMIT(...) EXPAND7(EXPAND7(__VA_ARGS__))
 
 /**
  * @brief Expands to a comma.
  */
 #define COMMA(...) ,
+
+#define ENCLOSE(...)        (__VA_ARGS__)
+#define UNCLOSE_UNEVAL(...) __VA_ARGS__
+#define UNCLOSE(...)        UNCLOSE_UNEVAL __VA_ARGS__
 
 #pragma endregion // mcmt_basic
 /*-------------------------------*/
@@ -107,14 +120,8 @@
  * @param _Y Second token.
  * @return Concatenation of the two tokens.
  */
-#define CONCAT(_X, _Y) _X##_Y
-/**
- * @brief Concatenate two tokens with an underscore in between.
- * @param _X First token.
- * @param _Y Second token.
- * @return Concatenation of the two tokens with an underscore in between.
- */
-#define CONCAT_(_X, _Y) _X##_##_Y
+#define CONCAT(_X, _Y) CONCAT_UNEVAL(_X, _Y)
+
 /**
  * @brief Concatenate three tokens.
  * @param _X First token.
@@ -122,15 +129,27 @@
  * @param _Z Third token.
  * @return Concatenation of the three tokens.
  */
-#define CONCAT3(_X, _Y, _Z) _X##_Y##_Z
-/**
- * @brief Concatenate three tokens with underscores in between.
- * @param _X First token.
- * @param _Y Second token.
- * @param _Z Third token.
- * @return Concatenation of the three tokens with underscores in between.
- */
-#define CONCAT3_(_X, _Y, _Z) _X##_##_Y##_##_Z
+#define CONCAT3(_X, _Y, _Z)         CONCAT3_UNEVAL(_X, _Y, _Z)
+#define CONCAT4(_X, _Y, _Z, _W)     CONCAT4_UNEVAL(_X, _Y, _Z, _W)
+#define CONCAT5(_X, _Y, _Z, _W, _V) CONCAT5_UNEVAL(_X, _Y, _Z, _W, _V)
+#define CONCAT_VA(_Arg, ...)        CONCAT_VA_UNEVAL(_Arg, __VA_ARGS__)
+
+#define PRIM_CONCAT(_X, _Y) _X##_Y
+#if defined(_MSC_VER)
+#    define CONCAT_RETURN(EXPANDED, _XY)       _XY
+#    define CONCAT_UNEVAL(_X, _Y)              CONCAT_RETURN(~, _X##_Y)
+#    define CONCAT3_UNEVAL(_X, _Y, _Z)         CONCAT_RETURN(~, _X##_Y##_Z)
+#    define CONCAT4_UNEVAL(_X, _Y, _Z, _W)     CONCAT_RETURN(~, _X##_Y##_Z##_W)
+#    define CONCAT5_UNEVAL(_X, _Y, _Z, _W, _V) CONCAT_RETURN(~, _X##_Y##_Z##_W##_V)
+#    define CONCAT_VA_RETURN(EXPANDED, ...)    __VA_ARGS__
+#    define CONCAT_VA_UNEVAL(_Arg, ...)        CONCAT_VA_RETURN(~, _Arg##__VA_ARGS__)
+#else // !MSVC workarounds
+#    define CONCAT_UNEVAL(_X, _Y)              _X##_Y
+#    define CONCAT3_UNEVAL(_X, _Y, _Z)         _X##_Y##_Z
+#    define CONCAT4_UNEVAL(_X, _Y, _Z, _W)     _X##_Y##_Z##_W
+#    define CONCAT5_UNEVAL(_X, _Y, _Z, _W, _V) _X##_Y##_Z##_W##_V
+#    define CONCAT_VA_UNEVAL(_Arg, ...)        _Arg##__VA_ARGS__
+#endif // defined(_MSC_VER)
 
 #pragma endregion // mcmt_concat
 /*-------------------------------*/
@@ -141,91 +160,65 @@
  *********************************/
 #pragma region mcmt_cat
 
-/* complex concatenate */
-#define CAT(_X, _Y)  EXPAND_CAT_WITH(GET_CAT_EXP(_X, _Y))
-#define CAT_(_X, _Y) EXPAND_CAT_WITH(GET_CAT_EXP(_X, CONCAT(_, _Y)))
-
-/* defer call to CAT_WITH until args are evaluated */
-#define EXPAND_CAT_WITH(...) CAT_WITH __VA_ARGS__
-#define GET_CAT_EXP(_X, _Y)  (_X, ENCLOSE_EXPAND _Y, DEFAULT, _Y)
-#define ENCLOSE_EXPAND(...) EXPAND, ENCLOSED, (__VA_ARGS__) ) IGNORE (
-
 /* different flavors of CAT */
 #define CAT_WITH(_X, _, _METHOD, _Y) CAT_WITH_##_METHOD(_X, _Y)
 #define CAT_WITH_ENCLOSED(_X, _Y)    _X _Y
 #define CAT_WITH_DEFAULT(_X, _Y)     _X##_Y
 
+/* defer call to CAT_WITH until args are evaluated */
+#define ENCLOSE_EXPAND(...) EXPAND, ENCLOSED, (__VA_ARGS__) ) IGNORE (
+#define GET_CAT_EXP(_X, _Y)  (_X, ENCLOSE_EXPAND _Y, DEFAULT, _Y)
+#define EXPAND_CAT_WITH(...) CAT_WITH __VA_ARGS__
+
+/* complex concatenate */
+#define CAT(_X, _Y)  EXPAND_CAT_WITH(GET_CAT_EXP(_X, _Y))
+#define CAT_(_X, _Y) EXPAND_CAT_WITH(GET_CAT_EXP(_X, CONCAT(_, _Y)))
+
 #pragma endregion // mcmt_cat
 /*-------------------------------*/
 
 /**********************************
- * MCMT_IMPL_OVERLOAD_H
- * @brief Macros for General Macro Overloading.
+ * MCMT_MACRO_IMPL_EXTN_OVLD_H
+ * @brief Macros for extending, implementing, and overloading generic macros
  *********************************/
-#pragma region mcmt_impl_overload
+#pragma region mcmt_macro_impl_extn_ovld
 
-/**
- * @brief Generates a macro name with a double underscore prefix.
- * @param _OP The operation.
- * @details For example, if `_OP` is `ADD`, this macro generates `__ADD`.
- */
-#define IMPL(_OP) __##_OP
-/**
- * @brief Generates a macro name with a single underscore suffix.
- * @param _OP The operation.
- * @details For example, if `_OP` is `ADD`, this macro generates `__ADD_`.
- */
-#define IMPL_(_OP) __##_OP##_
-/**
- * @brief Generates a macro name for unary unevaluated overload.
- * @param _OP The operation.
- * @param _X The operand.
- * @details For example, if `_OP` is `ADD` and `_X` is `A`, this macro generates `__ADD_A`.
- */
-#define IMPL_OVERLOAD_UNARY_UNEVAL(_OP, _X) __##_OP##_##_X
-/**
- * @brief Generates a macro name for binary unevaluated overload.
- * @param _OP The operation.
- * @param _X The first operand.
- * @param _Y The second operand.
- * @details For example, if `_OP` is `ADD`, `_X` is `A`, and `_Y` is `B`, this macro generates `__ADD_A_B`.
- */
-#define IMPL_OVERLOAD_BINARY_UNEVAL(_OP, _X, _Y) __##_OP##_##_X##_##_Y
-/**
- * @brief Generates a macro name for ternary unevaluated overload.
- * @param _OP The operation.
- * @param _X The first operand.
- * @param _Y The second operand.
- * @param _Z The third operand.
- * @details For example, if `_OP` is `ADD`, `_X` is `A`, `_Y` is `B`, and `_Z` is `C`, this macro generates `__ADD_A_B_C`.
- */
-#define IMPL_OVERLOAD_TRINARY_UNEVAL(_OP, _X, _Y, _Z) __##_OP##_##_X##_##_Y##_##_Z
-/**
- * @brief Generates a macro name for unary overload.
- * @param _OP The operation.
- * @param _X The operand.
- * @details For example, if `_OP` is `ADD` and `_X` is `A`, this macro generates `__ADD_A`.
- */
-#define IMPL_OVERLOAD_UNARY(_OP, _X) CAT(IMPL_(_OP), _X)
-/**
- * @brief Generates a macro name for binary overload.
- * @param _OP The operation.
- * @param _X The first operand.
- * @param _Y The second operand.
- * @details For example, if `_OP` is `ADD`, `_X` is `A`, and `_Y` is `B`, this macro generates `__ADD_A_B`.
- */
-#define IMPL_OVERLOAD_BINARY(_OP, _X, _Y) CAT_(CAT(IMPL_(_OP), _X), _Y)
-/**
- * @brief Generates a macro name for ternary overload.
- * @param _OP The operation.
- * @param _X The first operand.
- * @param _Y The second operand.
- * @param _Z The third operand.
- * @details For example, if `_OP` is `ADD`, `_X` is `A`, `_Y` is `B`, and `_Z` is `C`, this macro generates `__ADD_A_B_C`.
- */
-#define IMPL_OVERLOAD_TRINARY(_OP, _X, _Y, _Z) CAT_(CAT_(CAT(IMPL_(_OP), _X), _Y), _Z)
+#define MACRO_EXTN(_MCR, _EXTS)                               MACRO_EXTN_UNEVAL(_MCR, _EXTS)
+#define MACRO_IMPL(_MCR)                                      MACRO_IMPL_UNEVAL(_MCR)
+#define MACRO_IMPL_OVERLOAD(_MCR_Suffixed)                    MACRO_IMPL_OVERLOAD_UNEVAL(_MCR_Suffixed)
+#define MACRO_IMPL_OVERLOAD_UNARY(_MCR_Suffixed, _OVLS)       MACRO_IMPL_OVERLOAD_UNARY_UNEVAL(_MCR_Suffixed, _OVLS)
+#define MACRO_IMPL_OVERLOAD_BINARY(_MCR_Suffixed, _OVLS, _OP) MACRO_IMPL_OVERLOAD_BINARY_UNEVAL(_MCR_Suffixed, _OVLS, _OP)
+#define OPER_EXTN(_OP, _EXTS)                                 OPER_EXTN_UNEVAL(_OP, _EXTS)
+#define OPER_IMPL(_OP)                                        OPER_IMPL_UNEVAL(_OP)
+#define OPER_IMPL_OVERLOAD(_OP_Suffixed)                      OPER_IMPL_OVERLOAD_UNEVAL(_OP_Suffixed)
+#define OPER_IMPL_OVERLOAD_UNARY(_OP_Suffixed, _operand)      OPER_IMPL_OVERLOAD_UNARY_UNEVAL(_OP_Suffixed, _operand)
+#define OPER_IMPL_OVERLOAD_BINARY(_OP_Suffixed, _lhs, _rhs)   OPER_IMPL_OVERLOAD_BINARY_UNEVAL(_OP_Suffixed, _lhs, _rhs)
 
-#pragma endregion // mcmt_impl_overload
+#if defined(_MSC_VER)
+#    define MACRO_EXTN_UNEVAL(_MCR, _EXTS)                               CONCAT_RETURN(~, _MCR##_##_EXTS)
+#    define MACRO_IMPL_UNEVAL(_MCR)                                      CONCAT_RETURN(~, __##_MCR)
+#    define MACRO_IMPL_OVERLOAD_UNEVAL(_MCR_Suffixed)                    CONCAT_RETURN(~, __##_MCR_Suffixed)
+#    define MACRO_IMPL_OVERLOAD_UNARY_UNEVAL(_MCR_Suffixed, _OVLS)       CONCAT_RETURN(~, __##_MCR_Suffixed##_OVLS)
+#    define MACRO_IMPL_OVERLOAD_BINARY_UNEVAL(_MCR_Suffixed, _OVLS, _OP) CONCAT_RETURN(~, __##_MCR_Suffixed##_##_OVLS##_##_OP)
+#    define OPER_EXTN_UNEVAL(_OP, _EXTS)                                 CONCAT_RETURN(~, _OP##_##_EXTS)
+#    define OPER_IMPL_UNEVAL(_OP)                                        CONCAT_RETURN(~, __##_OP)
+#    define OPER_IMPL_OVERLOAD_UNEVAL(_OP_Suffixed)                      CONCAT_RETURN(~, __##_OP_Suffixed)
+#    define OPER_IMPL_OVERLOAD_UNARY_UNEVAL(_OP_Suffixed, _operand)      CONCAT_RETURN(~, __##_OP_Suffixed##_operand)
+#    define OPER_IMPL_OVERLOAD_BINARY_UNEVAL(_OP_Suffixed, _lhs, _rhs)   CONCAT_RETURN(~, __##_OP_Suffixed##_lhs##_rhs)
+#else // !MSVC workarounds
+#    define MACRO_EXTN_UNEVAL(_MCR, _EXTS)                               _MCR##_##_EXTS
+#    define MACRO_IMPL_UNEVAL(_MCR)                                      __##_MCR
+#    define MACRO_IMPL_OVERLOAD_UNEVAL(_MCR_Suffixed)                    __##_MCR_Suffixed
+#    define MACRO_IMPL_OVERLOAD_UNARY_UNEVAL(_MCR_Suffixed, _OVLS)       __##_MCR_Suffixed##_OVLS
+#    define MACRO_IMPL_OVERLOAD_BINARY_UNEVAL(_MCR_Suffixed, _OVLS, _OP) __##_MCR_Suffixed##_##_OVLS##_##_OP
+#    define OPER_EXTN_UNEVAL(_OP, _EXTS)                                 _OP##_##_EXTS
+#    define OPER_IMPL_UNEVAL(_OP)                                        __##_OP
+#    define OPER_IMPL_OVERLOAD_UNEVAL(_OP_Suffixed)                      __##_OP_Suffixed
+#    define OPER_IMPL_OVERLOAD_UNARY_UNEVAL(_OP_Suffixed, _operand)      __##_OP_Suffixed##_operand
+#    define OPER_IMPL_OVERLOAD_BINARY_UNEVAL(_OP_Suffixed, _lhs, _rhs)   __##_OP_Suffixed##_lhs##_rhs
+#endif // defined(_MSC_VER)
+
+#pragma endregion // mcmt_macro_impl_extn_ovld
 /*-------------------------------*/
 
 /**********************************
@@ -442,6 +435,9 @@
 #pragma endregion // mcmt_arg_count
 /*------- MCMT_ARG_COUNT_H -------*/
 
+#define REPLACE_REST(...) __VA_ARGS__) IGNORE(
+#define REPLACE_REST_TO_ENCLOSED(_ArgsEnclosed) UNCLOSE(_ArgsEnclosed)) IGNORE(
+
 #pragma endregion // mcmt_arg
 /*--------------------------------*/
 
@@ -504,7 +500,15 @@
  * This top-level macro provides a convenient way to apply multiple evaluations to a set of arguments without the need to
  * manually specify the recursion depth.
  */
-#define EVAL(...) EVAL_LIMIT(__VA_ARGS__)
+#define EVAL(...)  EVAL_LIMIT(__VA_ARGS__)
+#define EVAL0(...) __VA_ARGS__
+#define EVAL1(...) EVAL0(__VA_ARGS__)
+#define EVAL2(...) EVAL1(EVAL1(__VA_ARGS__))
+#define EVAL3(...) EVAL2(EVAL2(__VA_ARGS__))
+#define EVAL4(...) EVAL3(EVAL3(__VA_ARGS__))
+#define EVAL5(...) EVAL4(EVAL4(__VA_ARGS__))
+#define EVAL6(...) EVAL5(EVAL5(__VA_ARGS__))
+#define EVAL7(...) EVAL6(EVAL6(__VA_ARGS__))
 
 /**
  * @brief EVAL is a recursive macro that expands its arguments multiple times.
@@ -522,15 +526,7 @@
  * is defined to limit the number of recursive expansions to eight levels. You can increase or decrease this limit
  * according to your specific needs, but be mindful of the potential impact on compilation performance.
  */
-#define EVAL_LIMIT(...) EVAL8(EVAL8(__VA_ARGS__))
-#define EVAL8(...)      EVAL7(EVAL7(__VA_ARGS__))
-#define EVAL7(...)      EVAL6(EVAL6(__VA_ARGS__))
-#define EVAL6(...)      EVAL5(EVAL5(__VA_ARGS__))
-#define EVAL5(...)      EVAL4(EVAL4(__VA_ARGS__))
-#define EVAL4(...)      EVAL3(EVAL3(__VA_ARGS__))
-#define EVAL3(...)      EVAL2(EVAL2(__VA_ARGS__))
-#define EVAL2(...)      EVAL1(EVAL1(__VA_ARGS__))
-#define EVAL1(...)      __VA_ARGS__
+#define EVAL_LIMIT(...) EVAL7(EVAL7(__VA_ARGS__))
 // #define EVAL_LIMIT(...) EVAL8(EVAL8(EVAL8(EVAL8(EVAL8(EVAL8(EVAL8(EVAL8(__VA_ARGS__))))))))
 
 #pragma endregion // mcmt_recur_eval_h
@@ -583,43 +579,40 @@
 #define BIT_TRUE(...)  1
 #define BIT_FALSE(...) 0
 
-#define BIT_LOGICAL_OVERLOAD_UNARY(_OP, _bit)         __##BIT##_##_OP##_##_bit
-#define BIT_LOGICAL_OVERLOAD_BINARY(_OP, _p, _q)      __##BIT##_##_OP##_##_p##_q
-#define BIT_LOGICAL_OVERLOAD_TRINARY(_OP, _p, _q, _r) __##BIT##_##_OP##_##_p##_q##_r
-
-#define BIT_CMPL(_bit)      BIT_LOGICAL_OVERLOAD_UNARY(CMPL, _bit)
+#define BIT_CMPL(_bit)      OPER_IMPL_OVERLOAD_UNARY_UNEVAL(BIT_CMPL_, _bit)
 #define __BIT_CMPL_0        1
 #define __BIT_CMPL_1        0
-#define BIT_NOT(_bit)       BIT_LOGICAL_OVERLOAD_UNARY(NOT, _bit)
+#define BIT_NOT(_bit)       OPER_IMPL_OVERLOAD_UNARY_UNEVAL(BIT_NOT_, _bit)
 #define __BIT_NOT_0         1
 #define __BIT_NOT_1         0
-#define BIT_AND(_p, _q)     BIT_LOGICAL_OVERLOAD_BINARY(AND, _p, _q)
+#define BIT_AND(_p, _q)     OPER_IMPL_OVERLOAD_BINARY_UNEVAL(BIT_AND_, _p, _q)
 #define __BIT_AND_00        0
 #define __BIT_AND_01        0
 #define __BIT_AND_10        0
 #define __BIT_AND_11        1
-#define BIT_OR(_p, _q)      BIT_LOGICAL_OVERLOAD_BINARY(OR, _p, _q)
+#define BIT_OR(_p, _q)      OPER_IMPL_OVERLOAD_BINARY_UNEVAL(BIT_OR_, _p, _q)
 #define __BIT_OR_00         0
 #define __BIT_OR_01         1
 #define __BIT_OR_10         1
 #define __BIT_OR_11         1
-#define BIT_XOR(_p, _q)     BIT_LOGICAL_OVERLOAD_BINARY(XOR, _p, _q)
+#define BIT_XOR(_p, _q)     OPER_IMPL_OVERLOAD_BINARY_UNEVAL(BIT_XOR_, _p, _q)
 #define __BIT_XOR_00        0
 #define __BIT_XOR_01        1
 #define __BIT_XOR_10        1
 #define __BIT_XOR_11        0
-#define BIT_BOOL_EQ(_p, _q) BIT_LOGICAL_OVERLOAD_BINARY(BOOL_EQ, _p, _q)
+#define BIT_BOOL_EQ(_p, _q) OPER_IMPL_OVERLOAD_BINARY_UNEVAL(BIT_BOOL_EQ_, _p, _q)
 #define __BIT_BOOL_EQ_00    1
 #define __BIT_BOOL_EQ_01    0
 #define __BIT_BOOL_EQ_10    0
 #define __BIT_BOOL_EQ_11    1
 
-#define BIT_IF(_cond, _trueClause, ...)     BIT_LOGICAL_OVERLOAD_UNARY(IF, _cond)(_trueClause, __VA_ARGS__)
-#define __BIT_IF_0(trueClause, ...)         __VA_ARGS__
-#define __BIT_IF_1(_trueClause, ...)        _trueClause
-#define BIT_IF_NOT(_cond, _trueClause, ...) BIT_LOGICAL_OVERLOAD_UNARY(IF_NOT, _cond)(_trueClause, __VA_ARGS__)
-#define __BIT_IF_NOT_0(_trueClause, ...)    _trueClause
-#define __BIT_IF_NOT_1(trueClause, ...)     __VA_ARGS__
+/* if-statement: falseClause is optional */
+#define BIT_IF(_condBit, _trueClause, ...)     OPER_IMPL_OVERLOAD_UNARY_UNEVAL(BIT_IF_, _condBit)(_trueClause, __VA_ARGS__)
+#define __BIT_IF_0(trueClause, ...)            __VA_ARGS__
+#define __BIT_IF_1(_trueClause, ...)           _trueClause
+#define BIT_IF_NOT(_condBit, _trueClause, ...) OPER_IMPL_OVERLOAD_UNARY_UNEVAL(BIT_IF_NOT_, _condBit)(_trueClause, __VA_ARGS__)
+#define __BIT_IF_NOT_0(_trueClause, ...)       _trueClause
+#define __BIT_IF_NOT_1(trueClause, ...)        __VA_ARGS__
 
 #pragma endregion // mcmt_bit_logic
 /*-------------------------------*/
@@ -634,52 +627,46 @@
 #define PROBE()       ~, 1
 
 /* not */
-#define NOT(_value) IS_PROBE(IMPL_OVERLOAD_UNARY_UNEVAL(NOT, _value))
+#define NOT(_value) IS_PROBE(OPER_IMPL_OVERLOAD_UNARY_UNEVAL(NOT_, _value))
 #define __NOT_0     PROBE()
 
-/* complement */
-#define CMPL(_value) BIT_CMPL(_value)
-
 /* boolean */
-#define BOOL(_value) CMPL(NOT(_value))
+#define BOOL(_value) BIT_CMPL(NOT(_value))
 
 /* if-statement: falseClause is optional */
-#define IF(_cond)                    IMPL_OVERLOAD_UNARY(IF, BOOL(_cond))
-#define __IF_0(trueClause, ...)      __VA_ARGS__
-#define __IF_1(_trueClause, ...)     _trueClause
-#define IF_NOT(_cond)                IMPL_OVERLOAD_UNARY(IF_NOT, BOOL(_cond))
-#define __IF_NOT_0(_trueClause, ...) _trueClause
-#define __IF_NOT_1(trueClause, ...)  __VA_ARGS__
-#define WHEN(_pred)                  IF(_pred)(EXPAND, IGNORE)
-#define UNLESS(_pred)                IF_NOT(_pred)(EXPAND, IGNORE)
+#define IF(_cond)     OPER_IMPL_OVERLOAD_UNARY(BIT_IF_, BOOL(_cond))
+#define IF_NOT(_cond) OPER_IMPL_OVERLOAD_UNARY(BIT_IF_NOT_, BOOL(_cond))
+
+#define WHEN(_pred)   IF(_pred)(UNCLOSE, IGNORE)
+#define UNLESS(_pred) IF_NOT(_pred)(UNCLOSE, IGNORE)
 
 /******** exist_testing_macro ********/
 #pragma region exist_testing_macro
 
-/* extract the 2nd field in the tuple */
-#define TEST_EXISTS(_value) \
-    GET_TEST_EXIST_VALUE(GET_TEST_EXISTS_RESULT(_value))
-#define GET_TEST_EXIST_VALUE(_value)                        GET_TEST_EXIST_VALUE_UNEVAL _value
-#define GET_TEST_EXIST_VALUE_UNEVAL(expansion, _existValue) _existValue
-
 /* test if the value is an existing macro */
-#define GET_TEST_EXISTS_RESULT(_EXISTS) (IMPL_OVERLOAD_UNARY(EXPAND_TEST, _EXISTS), DOESNT_EXIST)
-#define __EXPAND_TEST_EXISTS(...) EXPAND, EXISTS(__VA_ARGS__) ) IGNORE (
+#define PATTERN_MATCH_EXISTS(...)  EXPANDED, EXISTS(__VA_ARGS__)) IGNORE(
+#define GET_PATTERN_EXISTS_RESULT(_EXISTS) (PRIM_CONCAT(PATTERN_MATCH_, _EXISTS), DOESNT_EXIST)
+
+/* extract the 2nd field in the tuple */
+#define __GET_PATTERN_EXIST_VALUE(EXPANDED, _existValue) _existValue
+#define GET_PATTERN_EXIST_VALUE(_resultPair)             __GET_PATTERN_EXIST_VALUE _resultPair
+#define EXISTS_PATTERN(_value) \
+    GET_PATTERN_EXIST_VALUE(GET_PATTERN_EXISTS_RESULT(_value))
 
 /* return 1 if exists, otherwise 0 */
-#define DOES_VALUE_EXIST(_EXISTS)       IMPL_OVERLOAD_UNARY(DOES_VALUE_EXIST, _EXISTS)
+#define DOES_VALUE_EXIST(_EXISTS)       OPER_IMPL_OVERLOAD_UNARY_UNEVAL(DOES_VALUE_EXIST_, _EXISTS)
 #define __DOES_VALUE_EXIST_DOESNT_EXIST 0
 #define __DOES_VALUE_EXIST_EXISTS(...)  1
 
 /* extract x from EXIST(x) */
-#define EXTRACT_VALUE(_EXISTS)      IMPL_OVERLOAD_UNARY(EXTRACT_VALUE, _EXISTS)
+#define EXTRACT_VALUE(_value)       OPER_IMPL_OVERLOAD_UNARY_UNEVAL(EXTRACT_VALUE_, _value)
 #define __EXTRACT_VALUE_EXISTS(...) __VA_ARGS__
 
 /* extract value if exists, otherwise return given default value */
-#define TRY_EXTRACT_EXISTS(_value, ...)       \
-    IF(DOES_VALUE_EXIST(TEST_EXISTS(_value))) \
-    (                                         \
-        EXTRACT_VALUE(_value), __VA_ARGS__    \
+#define TRY_EXTRACT_EXISTS(value, ...)          \
+    IF(DOES_VALUE_EXIST(EXISTS_PATTERN(value))) \
+    (                                           \
+        EXTRACT_VALUE(value), __VA_ARGS__       \
     )
 
 #pragma endregion // exist_testing_macro
@@ -688,28 +675,24 @@
 /******** boolean_operations ********/
 #pragma region boolean_operations
 
-#define BOOL_OVERLOAD_UNARY(_OP, _x, _default)           TRY_EXTRACT_EXISTS(CAT(IMPL_(_OP), _x), _default)
-#define BOOL_OVERLOAD_BINARY(_OP, _x, _y, _default)      TRY_EXTRACT_EXISTS(CAT(CAT(IMPL_(_OP), _x), _y), _default)
-#define BOOL_OVERLOAD_TRINARY(_OP, _x, _y, _z, _default) TRY_EXTRACT_EXISTS(CAT(CAT(CAT(IMPL_(_OP), _x), _y), _z), _default)
+#define BOOL_OPER_OVERLOAD_UNARY(_OP_Suffixed, _x, _default)      TRY_EXTRACT_EXISTS(OPER_IMPL_OVERLOAD_UNARY_UNEVAL(_OP_Suffixed, _x), _default)
+#define BOOL_OPER_OVERLOAD_BINARY(_OP_Suffixed, _x, _y, _default) TRY_EXTRACT_EXISTS(OPER_IMPL_OVERLOAD_BINARY_UNEVAL(_OP_Suffixed, _x, _y), _default)
 
-#define BOOL_NOT(x)  BOOL_OVERLOAD_UNARY(NOT, x, 0)
-#define __BOOL_NOT_0 EXISTS(1)
+#define AND(x, y) BOOL_OPER_OVERLOAD_BINARY(AND_, x, y, 0)
+#define __AND_11  EXISTS(1)
 
-#define AND(_x, _y) BOOL_OVERLOAD_BINARY(AND, _x, _y, 0)
-#define __AND_11    EXISTS(1)
+#define OR(x, y) BOOL_OPER_OVERLOAD_BINARY(OR_, x, y, 1)
+#define __OR_00  EXISTS(0)
 
-#define OR(_x, _y) BOOL_OVERLOAD_BINARY(OR, _x, _y, 1)
-#define __OR_00    EXISTS(0)
+#define XOR(x, y) BOOL_OPER_OVERLOAD_BINARY(XOR_, x, y, 0)
+#define __XOR_01  EXISTS(1)
+#define __XOR_10  EXISTS(1)
 
-#define XOR(_x, _y) BOOL_OVERLOAD_BINARY(XOR, _x, _y, 0)
-#define __XOR_01    EXISTS(1)
-#define __XOR_10    EXISTS(1)
+#define IS_ZERO(x)     BOOL_OPER_OVERLOAD_UNARY(IS_ZERO_, x, 0)
+#define __IS_ZERO_0    EXISTS(1)
+#define IS_NOT_ZERO(x) NOT(IS_ZERO(x))
 
-#define IS_ZERO(_x)     BOOL_OVERLOAD_UNARY(IS_ZERO, _x, 0)
-#define __IS_ZERO_0     EXISTS(1)
-#define IS_NOT_ZERO(_x) NOT(IS_ZERO(_x))
-
-#define IS_ONE(_x)     BOOL_OVERLOAD_UNARY(IS_ONE, _x, 0)
+#define IS_ONE(_x)     BOOL_OPER_OVERLOAD_UNARY(IS_ONE_, x, 0)
 #define __IS_ONE_1     EXISTS(1)
 #define IS_NOT_ONE(_x) NOT(IS_ONE(_x))
 
@@ -744,21 +727,19 @@
  *********************************/
 #pragma region mcmt_tuple
 
-#define ENCLOSE(...)            (__VA_ARGS__)
-#define REM_ENCLOSE(...)        REM_ENCLOSE_UNEVAL __VA_ARGS__
-#define REM_ENCLOSE_UNEVAL(...) __VA_ARGS__
-
-#define IF_ENCLOSED(...)                  IMPL_OVERLOAD_UNARY(IF_ENCLOSED, IS_ENCLOSED(__VA_ARGS__))
+#define IF_ENCLOSED(...)                  OPER_IMPL_OVERLOAD_UNARY(IF_ENCLOSED_, IS_ENCLOSED(__VA_ARGS__))
 #define __IF_ENCLOSED_0(trueClause, ...)  __VA_ARGS__
 #define __IF_ENCLOSED_1(_trueClause, ...) _trueClause
 
 /* test if arguments is enclosed in parentheses */
-#define IS_ENCLOSED(_x, ...) TRY_EXTRACT_EXISTS(IS_ENCLOSE_TEST _x, 0)
-#define IS_ENCLOSE_TEST(...) EXISTS(1)
+#define IS_ENCLOSED(_x, ...) TRY_EXTRACT_EXISTS(TEST_ENCLOSED _x, 0)
+#define TEST_ENCLOSED(...)   EXISTS(1)
 
-#define OPT_REM_ENCLOSE(...) \
-    IF_ENCLOSED(__VA_ARGS__) \
-    (REM_ENCLOSE(__VA_ARGS__), __VA_ARGS__)
+#define OPT_UNCLOSE(...)                  \
+    IF_ENCLOSED(__VA_ARGS__)              \
+    (                                     \
+        UNCLOSE(__VA_ARGS__), __VA_ARGS__ \
+    )
 
 #pragma endregion // mcmt_tuple
 /*-------------------------------*/
@@ -773,7 +754,7 @@
 #define FOR_EACH_UNEVAL(_OP, ...)                                    \
     IF(IS_NOT_EMPTY(__VA_ARGS__))                                    \
     (                                                                \
-        DEFER(_OP)(OPT_REM_ENCLOSE(LIST_HEAD(__VA_ARGS__)))          \
+        DEFER(_OP)(OPT_UNCLOSE(LIST_HEAD(__VA_ARGS__)))              \
             DEFER2(FOR_EACH_INDIRECT)()(_OP, LIST_TAIL(__VA_ARGS__)) \
     )
 #define FOR_EACH_INDIRECT() FOR_EACH_UNEVAL
@@ -854,16 +835,70 @@
 #pragma region mcmt_arith_basic
 
 /* increase */
-#define INC(_N) IMPL_OVERLOAD_UNARY(INC, _N)
+#define INC(_N) OPER_IMPL_OVERLOAD_UNARY_UNEVAL(INC_, _N)
 
 /* decrease */
-#define DEC(_N) IMPL_OVERLOAD_UNARY(DEC, _N)
+#define DEC(_N) OPER_IMPL_OVERLOAD_UNARY_UNEVAL(DEC_, _N)
 
 #pragma endregion // mcmt_arith_basic
 /*------- MCMT_ARITH_BASIC_H -------*/
 
+/**
+ * Q: Why are the EVALs below redefined even though they already exist?
+ * A: We've found that when macros that use loops/recursion are nested,
+ * i.e. when a parent recursive macro contains a child recursive macro that uses an EVAL to return a result,
+ * the parent EVAL extension of the EVAL level being used by the child recursive macro must be defined separately.
+ *
+ * If the parent recursive macro and the child recursive macro use the same level of EVAL, you will see the following result.
+ * `EVAL(EVAL(EVAL(EVAL(EVAL(EVAL(EVAL(...({return value})...)`
+ */
+
+#define ARITH_L0_EVAL0(...)      __VA_ARGS__
+#define ARITH_L0_EVAL1(...)      ARITH_L0_EVAL0(__VA_ARGS__)
+#define ARITH_L0_EVAL2(...)      ARITH_L0_EVAL1(ARITH_L0_EVAL1(__VA_ARGS__))
+#define ARITH_L0_EVAL3(...)      ARITH_L0_EVAL2(ARITH_L0_EVAL2(__VA_ARGS__))
+#define ARITH_L0_EVAL4(...)      ARITH_L0_EVAL3(ARITH_L0_EVAL3(__VA_ARGS__))
+#define ARITH_L0_EVAL5(...)      ARITH_L0_EVAL4(ARITH_L0_EVAL4(__VA_ARGS__))
+#define ARITH_L0_EVAL6(...)      ARITH_L0_EVAL5(ARITH_L0_EVAL5(__VA_ARGS__))
+#define ARITH_L0_EVAL7(...)      ARITH_L0_EVAL6(ARITH_L0_EVAL6(__VA_ARGS__))
+#define ARITH_L0_EVAL_LIMIT(...) ARITH_L0_EVAL7(ARITH_L0_EVAL7(__VA_ARGS__))
+#define ARITH_L0_EVAL(...)       ARITH_L0_EVAL_LIMIT(__VA_ARGS__)
+
+#define ARITH_L1_EVAL0(...)      __VA_ARGS__
+#define ARITH_L1_EVAL1(...)      ARITH_L1_EVAL0(__VA_ARGS__)
+#define ARITH_L1_EVAL2(...)      ARITH_L1_EVAL1(ARITH_L1_EVAL1(__VA_ARGS__))
+#define ARITH_L1_EVAL3(...)      ARITH_L1_EVAL2(ARITH_L1_EVAL2(__VA_ARGS__))
+#define ARITH_L1_EVAL4(...)      ARITH_L1_EVAL3(ARITH_L1_EVAL3(__VA_ARGS__))
+#define ARITH_L1_EVAL5(...)      ARITH_L1_EVAL4(ARITH_L1_EVAL4(__VA_ARGS__))
+#define ARITH_L1_EVAL6(...)      ARITH_L1_EVAL5(ARITH_L1_EVAL5(__VA_ARGS__))
+#define ARITH_L1_EVAL7(...)      ARITH_L1_EVAL6(ARITH_L1_EVAL6(__VA_ARGS__))
+#define ARITH_L1_EVAL_LIMIT(...) ARITH_L1_EVAL7(ARITH_L1_EVAL7(__VA_ARGS__))
+#define ARITH_L1_EVAL(...)       ARITH_L1_EVAL_LIMIT(__VA_ARGS__)
+
+#define ARITH_L2_EVAL0(...)      __VA_ARGS__
+#define ARITH_L2_EVAL1(...)      ARITH_L2_EVAL0(__VA_ARGS__)
+#define ARITH_L2_EVAL2(...)      ARITH_L2_EVAL1(ARITH_L2_EVAL1(__VA_ARGS__))
+#define ARITH_L2_EVAL3(...)      ARITH_L2_EVAL2(ARITH_L2_EVAL2(__VA_ARGS__))
+#define ARITH_L2_EVAL4(...)      ARITH_L2_EVAL3(ARITH_L2_EVAL3(__VA_ARGS__))
+#define ARITH_L2_EVAL5(...)      ARITH_L2_EVAL4(ARITH_L2_EVAL4(__VA_ARGS__))
+#define ARITH_L2_EVAL6(...)      ARITH_L2_EVAL5(ARITH_L2_EVAL5(__VA_ARGS__))
+#define ARITH_L2_EVAL7(...)      ARITH_L2_EVAL6(ARITH_L2_EVAL6(__VA_ARGS__))
+#define ARITH_L2_EVAL_LIMIT(...) ARITH_L2_EVAL7(ARITH_L2_EVAL7(__VA_ARGS__))
+#define ARITH_L2_EVAL(...)       ARITH_L2_EVAL_LIMIT(__VA_ARGS__)
+
+#define ARITH_L3_EVAL0(...)      __VA_ARGS__
+#define ARITH_L3_EVAL1(...)      ARITH_L3_EVAL0(__VA_ARGS__)
+#define ARITH_L3_EVAL2(...)      ARITH_L3_EVAL1(ARITH_L3_EVAL1(__VA_ARGS__))
+#define ARITH_L3_EVAL3(...)      ARITH_L3_EVAL2(ARITH_L3_EVAL2(__VA_ARGS__))
+#define ARITH_L3_EVAL4(...)      ARITH_L3_EVAL3(ARITH_L3_EVAL3(__VA_ARGS__))
+#define ARITH_L3_EVAL5(...)      ARITH_L3_EVAL4(ARITH_L3_EVAL4(__VA_ARGS__))
+#define ARITH_L3_EVAL6(...)      ARITH_L3_EVAL5(ARITH_L3_EVAL5(__VA_ARGS__))
+#define ARITH_L3_EVAL7(...)      ARITH_L3_EVAL6(ARITH_L3_EVAL6(__VA_ARGS__))
+#define ARITH_L3_EVAL_LIMIT(...) ARITH_L3_EVAL7(ARITH_L3_EVAL7(__VA_ARGS__))
+#define ARITH_L3_EVAL(...)       ARITH_L3_EVAL_LIMIT(__VA_ARGS__)
+
 /* add */
-#define ADD(_A, _N) EVAL(ADD_UNEVAL(_A, _N))
+#define ADD(_A, _N) ARITH_L0_EVAL(ADD_UNEVAL(_A, _N))
 #define ADD_UNEVAL(_A, _N)                        \
     IF(IS_NOT_ZERO(_N))                           \
     (                                             \
@@ -873,7 +908,7 @@
 #define ADD_INDIRECT() ADD_UNEVAL
 
 /* subtract */
-#define SUB(_A, _N) EVAL(SUB_UNEVAL(_A, _N))
+#define SUB(_A, _N) ARITH_L0_EVAL(SUB_UNEVAL(_A, _N))
 #define SUB_UNEVAL(_A, _N)                        \
     IF(IS_NOT_ZERO(_N))                           \
     (                                             \
@@ -883,7 +918,7 @@
 #define SUB_INDIRECT() SUB_UNEVAL
 
 /* multiply */
-#define MUL(_A, _N) EVAL(MUL_UNEVAL(_A, _N, 0))
+#define MUL(_A, _N) ARITH_L1_EVAL(MUL_UNEVAL(_A, _N, 0))
 #define MUL_UNEVAL(_A, _COUNT, _SUM)       \
     IF(IS_NOT_ZERO(_COUNT))                \
     (                                      \
@@ -894,8 +929,8 @@
     )
 #define MUL_INDIRECT() MUL_UNEVAL
 
-/* division */
-#define DIV(_A, _N) EVAL(DIV_UNEVAL(_A, _N, 0, _A)) /* EXPAND defines quotient range */
+/* divide */
+#define DIV(_A, _N) ARITH_L1_EVAL(DIV_UNEVAL(_A, _N, 0, _A)) /* ARITH_L1_EVAL defines QUOTIENT range */
 #define DIV_UNEVAL(_A, _N, _QUOTIENT, _REMAINDER)       \
     IF(IS_NOT_ZERO(_REMAINDER))                         \
     (                                                   \
@@ -907,7 +942,7 @@
 #define DIV_INDIRECT() DIV_UNEVAL
 
 /* binominal */
-#define BINOM(_N, _K) EVAL(BINOM_UNEVAL(_N, _K, 1, 1))
+#define BINOM(_N, _K) ARITH_L2_EVAL(BINOM_UNEVAL(_N, _K, 1, 1)) /* ARITH_L2_EVAL defines max K */
 #define BINOM_UNEVAL(_N, _K, _NUMER, _DENOM)                   \
     IF(IS_NOT_ZERO(_K))                                        \
     (                                                          \
