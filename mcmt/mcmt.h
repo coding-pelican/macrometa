@@ -30,7 +30,7 @@
  * - @ref mcmt_basic: Basic macros for handling empty arguments and expansions.
  * - @ref mcmt_concat: Macros for concatenating and manipulating identifiers.
  * - @ref mcmt_cat: Macros for complex identifier concatenation and deferring macro calls.
- * - @ref mcmt_macro_impl_extn_ovld: Macros for extending, implementing, and overloading generic macros.
+ * - @ref mcmt_macro_extn_impl_ovld: Macros for extending, implementing, and overloading generic macros.
  * - @ref mcmt_arg: Macros for manipulating and counting arguments.
  * - @ref mcmt_bit_logic: Macros for bitwise logic operations.
  * - @ref mcmt_logic: Macros for boolean and logical operations.
@@ -161,12 +161,12 @@
 #pragma region mcmt_cat
 
 /* different flavors of CAT */
-#define CAT_WITH(_X, _, _METHOD, _Y) CAT_WITH_##_METHOD(_X, _Y)
-#define CAT_WITH_ENCLOSED(_X, _Y)    _X _Y
-#define CAT_WITH_DEFAULT(_X, _Y)     _X##_Y
+#define CAT_WITH(_X, EXPANDED, _METHOD, _Y) CAT_WITH_##_METHOD(_X, _Y)
+#define CAT_WITH_ENCLOSED(_X, _Y)           _X _Y
+#define CAT_WITH_DEFAULT(_X, _Y)            _X##_Y
 
 /* defer call to CAT_WITH until args are evaluated */
-#define ENCLOSE_EXPAND(...) EXPAND, ENCLOSED, (__VA_ARGS__) ) IGNORE (
+#define ENCLOSE_EXPAND(...) EXPANDED, ENCLOSED, (__VA_ARGS__))IGNORE(
 #define GET_CAT_EXP(_X, _Y)  (_X, ENCLOSE_EXPAND _Y, DEFAULT, _Y)
 #define EXPAND_CAT_WITH(...) CAT_WITH __VA_ARGS__
 
@@ -178,10 +178,10 @@
 /*-------------------------------*/
 
 /**********************************
- * MCMT_MACRO_IMPL_EXTN_OVLD_H
+ * MCMT_MACRO_EXTN_IMPL_OVLD_H
  * @brief Macros for extending, implementing, and overloading generic macros
  *********************************/
-#pragma region mcmt_macro_impl_extn_ovld
+#pragma region mcmt_macro_extn_impl_ovld
 
 #define MACRO_EXTN(_MCR, _EXTS)                               MACRO_EXTN_UNEVAL(_MCR, _EXTS)
 #define MACRO_IMPL(_MCR)                                      MACRO_IMPL_UNEVAL(_MCR)
@@ -218,7 +218,7 @@
 #    define OPER_IMPL_OVERLOAD_BINARY_UNEVAL(_OP_Suffixed, _lhs, _rhs)   __##_OP_Suffixed##_lhs##_rhs
 #endif // defined(_MSC_VER)
 
-#pragma endregion // mcmt_macro_impl_extn_ovld
+#pragma endregion // mcmt_macro_extn_impl_ovld
 /*-------------------------------*/
 
 /**********************************
@@ -404,6 +404,7 @@
  */
 #pragma region mcmt_arg_count
 
+// TODO(DevDasae): Implement COUNT_OPT, Research recursive parameter counting methods
 /**
  * @brief Counts the number of arguments in a variadic argument list.
  * @param ... The variadic arguments.
@@ -633,6 +634,7 @@
 /* boolean */
 #define BOOL(_value) BIT_CMPL(NOT(_value))
 
+// TODO(DevDasae): Research IF structures for code readability
 /* if-statement: falseClause is optional */
 #define IF(_cond)     OPER_IMPL_OVERLOAD_UNARY(BIT_IF_, BOOL(_cond))
 #define IF_NOT(_cond) OPER_IMPL_OVERLOAD_UNARY(BIT_IF_NOT_, BOOL(_cond))
@@ -648,8 +650,8 @@
 #define GET_PATTERN_EXISTS_RESULT(_EXISTS) (PRIM_CONCAT(PATTERN_MATCH_, _EXISTS), DOESNT_EXIST)
 
 /* extract the 2nd field in the tuple */
-#define __GET_PATTERN_EXIST_VALUE(EXPANDED, _existValue) _existValue
-#define GET_PATTERN_EXIST_VALUE(_resultPair)             __GET_PATTERN_EXIST_VALUE _resultPair
+#define GET_PATTERN_EXIST_VALUE_EXPANDER(EXPANDED, _existValue) _existValue
+#define GET_PATTERN_EXIST_VALUE(_resultPair)                    GET_PATTERN_EXIST_VALUE_EXPANDER _resultPair
 #define EXISTS_PATTERN(_value) \
     GET_PATTERN_EXIST_VALUE(GET_PATTERN_EXISTS_RESULT(_value))
 
@@ -719,6 +721,7 @@
 #define IS_NOT_EMPTY(...) \
     NOT(IS_EMPTY(__VA_ARGS__))
 
+
 #pragma endregion // mcmt_list
 /*-------------------------------*/
 
@@ -727,18 +730,20 @@
  *********************************/
 #pragma region mcmt_tuple
 
-#define IF_ENCLOSED(...)                  OPER_IMPL_OVERLOAD_UNARY(IF_ENCLOSED_, IS_ENCLOSED(__VA_ARGS__))
-#define __IF_ENCLOSED_0(trueClause, ...)  __VA_ARGS__
-#define __IF_ENCLOSED_1(_trueClause, ...) _trueClause
-
 /* test if arguments is enclosed in parentheses */
 #define IS_ENCLOSED(_x, ...) TRY_EXTRACT_EXISTS(TEST_ENCLOSED _x, 0)
 #define TEST_ENCLOSED(...)   EXISTS(1)
 
-#define OPT_UNCLOSE(...)                  \
-    IF_ENCLOSED(__VA_ARGS__)              \
-    (                                     \
-        UNCLOSE(__VA_ARGS__), __VA_ARGS__ \
+// TODO(DevDasae): Apply BIT_IF
+#define IF_ENCLOSED(...)                  OPER_IMPL_OVERLOAD_UNARY(IF_ENCLOSED_, IS_ENCLOSED(__VA_ARGS__))
+#define __IF_ENCLOSED_0(trueClause, ...)  __VA_ARGS__
+#define __IF_ENCLOSED_1(_trueClause, ...) _trueClause
+
+#define UNCLOSE_OPT(...)      \
+    IF_ENCLOSED(__VA_ARGS__)  \
+    (                         \
+        UNCLOSE(__VA_ARGS__), \
+        __VA_ARGS__           \
     )
 
 #pragma endregion // mcmt_tuple
@@ -749,46 +754,46 @@
  *********************************/
 #pragma region mcmt_for_each
 
+// TODO(DevDasae): Refactor this parts
 /* 1D */
 #define FOR_EACH(_OP, ...) EVAL(FOR_EACH_UNEVAL(_OP, __VA_ARGS__))
-#define FOR_EACH_UNEVAL(_OP, ...)                                    \
-    IF(IS_NOT_EMPTY(__VA_ARGS__))                                    \
-    (                                                                \
-        DEFER(_OP)(OPT_UNCLOSE(LIST_HEAD(__VA_ARGS__)))              \
-            DEFER2(FOR_EACH_INDIRECT)()(_OP, LIST_TAIL(__VA_ARGS__)) \
+#define FOR_EACH_UNEVAL(_OP, ...)                                                                                \
+    IF(IS_NOT_EMPTY(__VA_ARGS__))                                                                                \
+    (                                                                                                            \
+        DEFER(_OP)(UNCLOSE_OPT(LIST_HEAD(__VA_ARGS__))) DEFER2(FOR_EACH_INDIRECT)()(_OP, LIST_TAIL(__VA_ARGS__)) \
     )
 #define FOR_EACH_INDIRECT() FOR_EACH_UNEVAL
 
 /* 2D */
 #define FOR_EACH_2D(_OP, _List1, _List2)        EVAL(FOR_EACH_2D_UNEVAL(_OP, _List1, _List2))
 #define FOR_EACH_2D_UNEVAL(_OP, _List1, _List2) __FOR_EACH_2D(_OP, _List1, _List1, _List2, _List2)
-#define __FOR_EACH_2D(_OP, _List1, _OriginList1, _List2, _OriginList2)                                                          \
-    IF(IS_NOT_EMPTY _List2)                                                                                                     \
-    (                                                                                                                           \
-        _OP(LIST_HEAD _List1, LIST_HEAD _List2)                                                                                 \
-            DEFER2(FOR_EACH_2D_INDIRECT)()(_OP, _List1, _List1, (LIST_TAIL _List2), _OriginList2),                              \
-        IF(IS_NOT_EMPTY(LIST_TAIL _List1))(                                                                                     \
-            DEFER3(FOR_EACH_2D_INDIRECT)()(_OP, (LIST_TAIL _OriginList1), (LIST_TAIL _OriginList1), _OriginList2, _OriginList2) \
-        )                                                                                                                       \
+#define __FOR_EACH_2D(_OP, _List1, _OriginList1, _List2, _OriginList2)                                                                 \
+    IF(IS_NOT_EMPTY _List2)                                                                                                            \
+    (                                                                                                                                  \
+        _OP(LIST_HEAD _List1, LIST_HEAD _List2) DEFER2(FOR_EACH_2D_INDIRECT)()(_OP, _List1, _List1, (LIST_TAIL _List2), _OriginList2), \
+        IF(IS_NOT_EMPTY(LIST_TAIL _List1))(                                                                                            \
+            DEFER3(FOR_EACH_2D_INDIRECT)()(_OP, (LIST_TAIL _OriginList1), (LIST_TAIL _OriginList1), _OriginList2, _OriginList2)        \
+        )                                                                                                                              \
     )
 #define FOR_EACH_2D_INDIRECT() __FOR_EACH_2D
 
 /* 3D */
 #define FOR_EACH_3D(_OP, _List1, _List2, _List3)        EVAL(FOR_EACH_3D_UNEVAL(_OP, _List1, _List2, _List3))
-#define FOR_EACH_3D_UNEVAL(_OP, _List1, _List2, _List3) __FOR_EACH_3D(_OP, _List1, _List1, _List2, _List2, _List3, _List3)
-#define __FOR_EACH_3D(_OP, _List1, _OriginList1, _List2, _OriginList2, _List3, _OriginList3)                                                                        \
-    IF(IS_NOT_EMPTY _List3)                                                                                                                                         \
-    (                                                                                                                                                               \
-        _OP(LIST_HEAD _List1, LIST_HEAD _List2, LIST_HEAD _List3)                                                                                                   \
-            DEFER2(FOR_EACH_3D_INDIRECT)()(_OP, _List1, _List1, _List2, _List2, (LIST_TAIL _List3), _OriginList3),                                                  \
-        IF(IS_NOT_EMPTY(LIST_TAIL _List2))(                                                                                                                         \
-            DEFER3(FOR_EACH_3D_INDIRECT)()(_OP, _OriginList1, _OriginList1, (LIST_TAIL _OriginList2), (LIST_TAIL _OriginList2), _OriginList3, _OriginList3)         \
-                IF(IS_NOT_EMPTY(LIST_TAIL _List1))(                                                                                                                 \
-                    DEFER4(FOR_EACH_3D_INDIRECT)()(_OP, (LIST_TAIL _OriginList1), (LIST_TAIL _OriginList1), _OriginList2, _OriginList2, _OriginList3, _OriginList3) \
-                )                                                                                                                                                   \
-        )                                                                                                                                                           \
+#define FOR_EACH_3D_UNEVAL(_OP, _List1, _List2, _List3) __FOR_EACH_3D_UNEVAL(_OP, _List1, _List1, _List2, _List2, _List3, _List3)
+#define __FOR_EACH_3D_UNEVAL(_OP, _List1, _OriginList1, _List2, _OriginList2, _List3, _OriginList3)                                                                      \
+    IF(IS_NOT_EMPTY _List3)                                                                                                                                              \
+    (                                                                                                                                                                    \
+        _OP(LIST_HEAD _List1, LIST_HEAD _List2, LIST_HEAD _List3) DEFER2(FOR_EACH_3D_INDIRECT)()(_OP, _List1, _List1, _List2, _List2, (LIST_TAIL _List3), _OriginList3), \
+        IF(IS_NOT_EMPTY(LIST_TAIL _List2))(                                                                                                                              \
+            DEFER3(FOR_EACH_3D_INDIRECT)()(_OP, _OriginList1, _OriginList1, (LIST_TAIL _OriginList2), (LIST_TAIL _OriginList2), _OriginList3, _OriginList3)              \
+                IF(IS_NOT_EMPTY(LIST_TAIL _List1))(                                                                                                                      \
+                    DEFER4(FOR_EACH_3D_INDIRECT)()(                                                                                                                      \
+                        _OP, (LIST_TAIL _OriginList1), (LIST_TAIL _OriginList1), _OriginList2, _OriginList2, _OriginList3, _OriginList3                                  \
+                    )                                                                                                                                                    \
+                )                                                                                                                                                        \
+        )                                                                                                                                                                \
     )
-#define FOR_EACH_3D_INDIRECT() __FOR_EACH_3D
+#define FOR_EACH_3D_INDIRECT() __FOR_EACH_3D_UNEVAL
 
 #pragma endregion // mcmt_for_each
 /*-------------------------------*/
@@ -798,6 +803,7 @@
  *********************************/
 #pragma region mcmt_compare
 
+// TODO(DevDasae): Consider applying other CATs
 #define NOT_COMPARABLE(_p, _q)                   \
     IS_ENCLOSED(                                 \
         CAT_(COMPARE, _p)(CAT_(COMPARE, _q))(()) \
@@ -821,7 +827,7 @@
 /*
  * The 'EQUALS' operation requires a 'COMPARE_{arg}(_x) _x' macro function for each argument. ex) COMPARE_foo(_x) _x, COMPARE_bar(_x) _x
  */
-#define EQUALS(_p, _q) CMPL(NOT_EQUALS(_p, _q))
+#define EQUALS(_p, _q) BIT_CMPL(NOT_EQUALS(_p, _q))
 
 #pragma endregion // mcmt_compare
 /*-------------------------------*/
@@ -833,6 +839,9 @@
 
 /******** MCMT_ARITH_BASIC_H ********/
 #pragma region mcmt_arith_basic
+
+// TODO(DevDasae): Implement return of actual integer literal for N{number}
+// NOTE: Does this project require implementing unsigned operations or operations with negative ranges?
 
 /* increase */
 #define INC(_N) OPER_IMPL_OVERLOAD_UNARY_UNEVAL(INC_, _N)
@@ -853,6 +862,7 @@
  * `EVAL(EVAL(EVAL(EVAL(EVAL(EVAL(EVAL(...({return value})...)`
  */
 
+#define ARITH_L0_EVAL(...)       ARITH_L0_EVAL_LIMIT(__VA_ARGS__)
 #define ARITH_L0_EVAL0(...)      __VA_ARGS__
 #define ARITH_L0_EVAL1(...)      ARITH_L0_EVAL0(__VA_ARGS__)
 #define ARITH_L0_EVAL2(...)      ARITH_L0_EVAL1(ARITH_L0_EVAL1(__VA_ARGS__))
@@ -862,8 +872,8 @@
 #define ARITH_L0_EVAL6(...)      ARITH_L0_EVAL5(ARITH_L0_EVAL5(__VA_ARGS__))
 #define ARITH_L0_EVAL7(...)      ARITH_L0_EVAL6(ARITH_L0_EVAL6(__VA_ARGS__))
 #define ARITH_L0_EVAL_LIMIT(...) ARITH_L0_EVAL7(ARITH_L0_EVAL7(__VA_ARGS__))
-#define ARITH_L0_EVAL(...)       ARITH_L0_EVAL_LIMIT(__VA_ARGS__)
 
+#define ARITH_L1_EVAL(...)       ARITH_L1_EVAL_LIMIT(__VA_ARGS__)
 #define ARITH_L1_EVAL0(...)      __VA_ARGS__
 #define ARITH_L1_EVAL1(...)      ARITH_L1_EVAL0(__VA_ARGS__)
 #define ARITH_L1_EVAL2(...)      ARITH_L1_EVAL1(ARITH_L1_EVAL1(__VA_ARGS__))
@@ -873,8 +883,8 @@
 #define ARITH_L1_EVAL6(...)      ARITH_L1_EVAL5(ARITH_L1_EVAL5(__VA_ARGS__))
 #define ARITH_L1_EVAL7(...)      ARITH_L1_EVAL6(ARITH_L1_EVAL6(__VA_ARGS__))
 #define ARITH_L1_EVAL_LIMIT(...) ARITH_L1_EVAL7(ARITH_L1_EVAL7(__VA_ARGS__))
-#define ARITH_L1_EVAL(...)       ARITH_L1_EVAL_LIMIT(__VA_ARGS__)
 
+#define ARITH_L2_EVAL(...)       ARITH_L2_EVAL_LIMIT(__VA_ARGS__)
 #define ARITH_L2_EVAL0(...)      __VA_ARGS__
 #define ARITH_L2_EVAL1(...)      ARITH_L2_EVAL0(__VA_ARGS__)
 #define ARITH_L2_EVAL2(...)      ARITH_L2_EVAL1(ARITH_L2_EVAL1(__VA_ARGS__))
@@ -884,8 +894,8 @@
 #define ARITH_L2_EVAL6(...)      ARITH_L2_EVAL5(ARITH_L2_EVAL5(__VA_ARGS__))
 #define ARITH_L2_EVAL7(...)      ARITH_L2_EVAL6(ARITH_L2_EVAL6(__VA_ARGS__))
 #define ARITH_L2_EVAL_LIMIT(...) ARITH_L2_EVAL7(ARITH_L2_EVAL7(__VA_ARGS__))
-#define ARITH_L2_EVAL(...)       ARITH_L2_EVAL_LIMIT(__VA_ARGS__)
 
+#define ARITH_L3_EVAL(...)       ARITH_L3_EVAL_LIMIT(__VA_ARGS__)
 #define ARITH_L3_EVAL0(...)      __VA_ARGS__
 #define ARITH_L3_EVAL1(...)      ARITH_L3_EVAL0(__VA_ARGS__)
 #define ARITH_L3_EVAL2(...)      ARITH_L3_EVAL1(ARITH_L3_EVAL1(__VA_ARGS__))
@@ -895,7 +905,6 @@
 #define ARITH_L3_EVAL6(...)      ARITH_L3_EVAL5(ARITH_L3_EVAL5(__VA_ARGS__))
 #define ARITH_L3_EVAL7(...)      ARITH_L3_EVAL6(ARITH_L3_EVAL6(__VA_ARGS__))
 #define ARITH_L3_EVAL_LIMIT(...) ARITH_L3_EVAL7(ARITH_L3_EVAL7(__VA_ARGS__))
-#define ARITH_L3_EVAL(...)       ARITH_L3_EVAL_LIMIT(__VA_ARGS__)
 
 /* add */
 #define ADD(_A, _N) ARITH_L0_EVAL(ADD_UNEVAL(_A, _N))
@@ -919,13 +928,13 @@
 
 /* multiply */
 #define MUL(_A, _N) ARITH_L1_EVAL(MUL_UNEVAL(_A, _N, 0))
-#define MUL_UNEVAL(_A, _COUNT, _SUM)       \
-    IF(IS_NOT_ZERO(_COUNT))                \
-    (                                      \
-        DEFER2(MUL_INDIRECT)()(            \
-            _A, DEC(_COUNT), ADD(_SUM, _A) \
-        ),                                 \
-        _SUM                               \
+#define MUL_UNEVAL(_A, _N, _SUM)       \
+    IF(IS_NOT_ZERO(_COUNT))            \
+    (                                  \
+        DEFER2(MUL_INDIRECT)()(        \
+            _A, DEC(_N), ADD(_SUM, _A) \
+        ),                             \
+        _SUM                           \
     )
 #define MUL_INDIRECT() MUL_UNEVAL
 
@@ -961,16 +970,16 @@
  *********************************/
 #pragma region mcmt_range
 
-#define RANGE(_start, _end, _step)        EVAL2(RANGE_UNEVAL(_start, _end, _step))
-#define RANGE_UNEVAL(_start, _end, _step) __RANGE(_start, _end, _step) _end
-#define __RANGE(_start, _end, _step)                                  \
-    IF(IS_NOT_ZERO(SUB(_end, _start)))                                \
-    (                                                                 \
-        OUTPUT_RANGE_VAL(_start)                                      \
-            DEFER2(RANGE_INDIRECT)()(ADD(_start, _step), _end, _step) \
-    )
 #define OUTPUT_RANGE_VAL(_x) _x,
-#define RANGE_INDIRECT()     __RANGE
+
+#define RANGE(_start, _end, _step)        EVAL2(RANGE_UNEVAL(_start, _end, _step))
+#define RANGE_UNEVAL(_start, _end, _step) __RANGE_UNEVAL(_start, _end, _step) _end
+#define __RANGE_UNEVAL(_start, _end, _step)                                                \
+    IF(IS_NOT_ZERO(SUB(_end, _start)))                                                     \
+    (                                                                                      \
+        OUTPUT_RANGE_VAL(_start) DEFER2(RANGE_INDIRECT)()(ADD(_start, _step), _end, _step) \
+    )
+#define RANGE_INDIRECT() __RANGE_UNEVAL
 
 #pragma endregion // mcmt_range
 /*-------------------------------*/
