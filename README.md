@@ -19,7 +19,7 @@ The MCMT Library is organized into several sections, each dedicated to specific 
 - **mcmt_basic**: Basic macros for handling empty arguments and expansions.
 - **mcmt_concat**: Macros for concatenating and manipulating identifiers.
 - **mcmt_cat**: Macros for complex identifier concatenation and deferring macro calls.
-- **mcmt_macro_extn_impl_ovld**: Macros for extending, implementing, and overloading generic macros.
+- **mcmt_extn_impl_ovld**: Macros for extending, implementing, and overloading generic macros.
 - **mcmt_arg**: Macros for manipulating and counting arguments.
 - **mcmt_bit_logic**: Macros for bitwise logic operations.
 - **mcmt_logic**: Macros for boolean and logical operations.

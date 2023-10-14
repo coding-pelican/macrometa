@@ -30,7 +30,7 @@
  * - @ref mcmt_basic: Basic macros for handling empty arguments and expansions.
  * - @ref mcmt_concat: Macros for concatenating and manipulating identifiers.
  * - @ref mcmt_cat: Macros for complex identifier concatenation and deferring macro calls.
- * - @ref mcmt_macro_extn_impl_ovld: Macros for extending, implementing, and overloading generic macros.
+ * - @ref mcmt_extn_impl_ovld: Macros for extending, implementing, and overloading generic macros.
  * - @ref mcmt_arg: Macros for manipulating and counting arguments.
  * - @ref mcmt_bit_logic: Macros for bitwise logic operations.
  * - @ref mcmt_logic: Macros for boolean and logical operations.
@@ -160,6 +160,10 @@
  *********************************/
 #pragma region mcmt_cat
 
+/* complex concatenate */
+#define CAT(_X, _Y)  EXPAND_CAT_WITH(GET_CAT_EXP(_X, _Y))
+#define CAT_(_X, _Y) EXPAND_CAT_WITH(GET_CAT_EXP(_X, CONCAT(_, _Y)))
+
 /* different flavors of CAT */
 #define CAT_WITH(_X, EXPANDED, _METHOD, _Y) CAT_WITH_##_METHOD(_X, _Y)
 #define CAT_WITH_ENCLOSED(_X, _Y)           _X _Y
@@ -170,18 +174,14 @@
 #define GET_CAT_EXP(_X, _Y)  (_X, ENCLOSE_EXPAND _Y, DEFAULT, _Y)
 #define EXPAND_CAT_WITH(...) CAT_WITH __VA_ARGS__
 
-/* complex concatenate */
-#define CAT(_X, _Y)  EXPAND_CAT_WITH(GET_CAT_EXP(_X, _Y))
-#define CAT_(_X, _Y) EXPAND_CAT_WITH(GET_CAT_EXP(_X, CONCAT(_, _Y)))
-
 #pragma endregion // mcmt_cat
 /*-------------------------------*/
 
 /**********************************
- * MCMT_MACRO_EXTN_IMPL_OVLD_H
+ * MCMT_EXTN_IMPL_OVLD_H
  * @brief Macros for extending, implementing, and overloading generic macros
  *********************************/
-#pragma region mcmt_macro_extn_impl_ovld
+#pragma region mcmt_extn_impl_ovld
 
 #define MACRO_EXTN(_MCR, _EXTS)                               MACRO_EXTN_UNEVAL(_MCR, _EXTS)
 #define MACRO_IMPL(_MCR)                                      MACRO_IMPL_UNEVAL(_MCR)
@@ -218,7 +218,7 @@
 #    define OPER_IMPL_OVERLOAD_BINARY_UNEVAL(_OP_Suffixed, _lhs, _rhs)   __##_OP_Suffixed##_lhs##_rhs
 #endif // defined(_MSC_VER)
 
-#pragma endregion // mcmt_macro_extn_impl_ovld
+#pragma endregion // mcmt_extn_impl_ovld
 /*-------------------------------*/
 
 /**********************************
@@ -720,7 +720,6 @@
 
 #define IS_NOT_EMPTY(...) \
     NOT(IS_EMPTY(__VA_ARGS__))
-
 
 #pragma endregion // mcmt_list
 /*-------------------------------*/
